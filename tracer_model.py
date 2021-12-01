@@ -28,12 +28,11 @@ class Model:
     It is recommended to preprocess the image to obtain the best result. 
     """
 
-    def __init__(self, name=None, path=None):
+    def __init__(self, name: str=None, path: str=None) -> None:
         self.image_name = name
         self.image_path = path
-        self.threshold = 0
+        self.threshold = 0  # for grayscale image, currently uses 1-bit image
         
-        self.contour = []
         self.edge_dir = {'LEFT': (-1, 0), 
                          'DOWN': (0, 1), 
                          'RIGHT': (1, 0),
@@ -42,9 +41,8 @@ class Model:
                            'DOWN': (-1, -1), 
                            'RIGHT': (-1, 1), 
                            'UP': (1, 1)}
-        self.change_dir = self.direction_gen()
     
-    def open_image(self):
+    def open_image(self) -> None:
         """
         Opens image with pillow and saves it to a numpy array for the tracer. 
 
@@ -57,7 +55,7 @@ class Model:
         #self._image = np.array(self.pil_image.convert('L')) # grayscale
         self._image = np.array(self.pil_image.convert('1')) # black and white
         
-    def close_image(self):
+    def close_image(self) -> None:
         """
         Safely closes pillow image. 
 
@@ -68,15 +66,15 @@ class Model:
         """
         self.pil_image.close()
         
-    def set_start_position(self, x=None, y=None):
+    def set_start_position(self, x: int=None, y: int=None) -> None:
         """
         Sets the x, y coordinates of the start point, defined by the user. 
 
         Parameters
         ----------
-        x : <int>, optional
+        x : int, optional
             Start point x coordinate. The default is None.
-        y : <int>, optional
+        y : int, optional
             Start point y coordinate. The default is None.
 
         Returns
@@ -90,7 +88,7 @@ class Model:
             self.x = x
             self.y = y
     
-    def start_trace(self, direction):
+    def start_trace(self, direction: str) -> str:  
         """
         Starts tracing image feature of interest. Identifies first contour 
         pixel if available >> identified by comparison to a predefined 
@@ -98,7 +96,7 @@ class Model:
 
         Parameters
         ----------
-        direction : <string>
+        direction : str
             Direction in which the pixels are traversed while searching for 
             the contour. 
 
@@ -110,11 +108,13 @@ class Model:
 
         Returns
         -------
-        None.
+        str
+            Confirmation that the trace is finished. 
 
         """
         self.prev_dir = direction
-        self.task_finished = False
+        self.contour = []
+        self.change_dir = self.direction_gen()
         while True:
             _colour = self._image[self.y][self.x]
             if _colour <= self.threshold: 
@@ -132,10 +132,31 @@ class Model:
         else: 
             for i in range(2):
                 self.prev_dir = next(self.change_dir)
-        self.corner_position()
-        self.check_corner()
 
-    def corner_position(self): 
+        return self.continue_trace()
+
+    def continue_trace(self) -> str:
+        """
+        Continues with the trace function. 
+
+        Returns
+        -------
+        str
+            Confirmation that the trace is finished.
+
+        """
+        self.corner_position()
+        _method = self.check_corner()
+        
+        while True:
+            if _method == 'corner':
+                _method = self.check_corner()
+            elif _method == 'edge':
+                _method = self.check_edge()
+            elif _method == 'Done.':
+                return _method
+                
+    def corner_position(self) -> None: 
         """
         Reads the next pixel (corner pixel for function 'check_corner'), which 
         value is compared with the threshold. 
@@ -148,7 +169,7 @@ class Model:
         self.x, self.y = (sum(x) for x in zip((self.x, self.y), 
                                               self.corner_dir[self.prev_dir]))
         
-    def check_corner(self):
+    def check_corner(self) -> str:
         """
         Checks value of pixel diagonal to the previously identified contour 
         pixel: 
@@ -163,23 +184,23 @@ class Model:
 
         Returns
         -------
-        None.
+        str
+            Information about next step to be taken or halting message. 
 
         """
         if (self.x, self.y) == (self.contour[0], self.contour[1]):
-            self.task_finished = True
-            return None
+            return 'Done.'
         _colour = self._image[self.y][self.x]
         if _colour <= self.threshold:
             self.contour.extend((self.x, self.y))
             for i in range(3):
                 self.prev_dir = next(self.change_dir)
             self.corner_position()
-            self.check_corner()
+            return 'corner'
         else:
-            self.check_edge()
+            return 'edge'
 
-    def edge_position(self):
+    def edge_position(self) -> None:
         """
         Reads the next pixel (edge pixel for function 'check_edge'), which 
         value is compared with the threshold. 
@@ -192,7 +213,7 @@ class Model:
         self.x, self.y = (sum(x) for x in zip((self.x, self.y), 
                                               self.edge_dir[self.prev_dir]))
         
-    def check_edge(self):
+    def check_edge(self) -> str:
         """
         Checks value of pixel perpendicular to the previously identified 
         contour pixel: 
@@ -206,31 +227,30 @@ class Model:
 
         Returns
         -------
-        None.
+        str
+            Information about next step to be taken or halting message. 
 
         """
         self.edge_position()
         if (self.x, self.y) == (self.contour[0], self.contour[1]):
-            self.task_finished = True
-            return None
+            return 'Done.'
         _colour = self._image[self.y][self.x]
         if _colour <= self.threshold:
             self.contour.extend((self.x, self.y))
             self.corner_position()
-            self.check_corner()
         else:
             self.edge_position()
             self.prev_dir = next(self.change_dir)
-            self.check_corner()
+        return 'corner'
         
-    def direction_gen(self):
+    def direction_gen(self) -> str:
         """
         Generator function - generates a circular list containing the 
         directions. 
 
         Yields
         ------
-        <str>
+        str
             Identifier of the current direction the image is traversed.
 
         """
@@ -241,23 +261,15 @@ class Model:
             yield change_dir[i - 1]
             if i == 4:
                 i = 0     
-    
-    def check_trace_end(self):
-        """
-        Feedback to the GUI about the successful completion of task. 
-
-        Returns
-        -------
-        <str>
-            Confirmation of success.
-
-        """
-        if self.task_finished: 
-            return 'Done.'
         
-    def save_contour(self, filename=None):
+    def save_contour(self, filename: str=None) -> None:
         """
         Saves traced contour into external file. 
+
+        Parameters
+        ----------
+        filename : str, optional
+            DESCRIPTION. The default is None.
 
         Returns
         -------
@@ -269,6 +281,7 @@ class Model:
         with open(f'{self.contour_name}.txt', 'w') as f:
             for coord in self.contour:
                 f.write(str(coord) + '\n')
+        self.contour.clear()
 
 
     
@@ -276,13 +289,13 @@ class Model:
     
 
 if __name__ == '__main__':
-    trace = Model(name='Puzzle_02_cr2.png')
+    trace = Model(name='_input/Puzzle_02_cr2.png')
     trace.open_image()
     
     trace.set_start_position(x=710, y=650)
-    trace.start_trace('LEFT')
-    print(trace.check_trace_end())
-    trace.save_contour('first_try.txt')
+    print(trace.start_trace('LEFT'))
+    #print(trace.check_trace_end())
+    trace.save_contour('_output/first_try.txt')
     
     trace.close_image()
     #print(trace._image)
@@ -304,5 +317,5 @@ if __name__ == '__main__':
     plt.gca().invert_yaxis()
     plt.show()
 
-    with open('first_try.txt', 'r') as f:
+    with open('./_output/third.txt', 'r') as f:
         new = [int(x) for x in f]

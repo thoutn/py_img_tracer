@@ -80,29 +80,31 @@ class View(tk.Frame):
         None.
 
         """
-        menubar = tk.Menu(self.parent)
+        self.menubar = tk.Menu(self.parent)
         # By default, Tkinter adds a dashed line before the first menu item. 
         # When the dashed line is clicked, the main window will detach the 
         # menu from it. 
         # To remove the dashed line, the ['tearoff'] property of the menu is 
         # set to False. 
-        menubar.file_menu = tk.Menu(menubar, tearoff=False)
-        menubar.file_menu.add_command(label='Open...', underline=0, 
-                                      command=self.open_image)
-        menubar.file_menu.add_command(label='Close', underline=0, 
-                                      command=self.close_image)
-        menubar.file_menu.add_separator()
-        menubar.file_menu.add_command(label='Exit', underline=1, 
-                                      command=self.close_main)
-        menubar.add_cascade(label='File', menu=menubar.file_menu, underline=0)
+        self.file_menu = tk.Menu(self.menubar, tearoff=False)
+        self.file_menu.add_command(label='Open...', underline=0, 
+                                   command=self.open_image)
+        self.file_menu.add_command(label='Close', underline=0, 
+                                   command=self.close_image)
+        self.file_menu.entryconfig(index=1, state='disabled')
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label='Exit', underline=1, 
+                                   command=self.close_main)
+        self.menubar.add_cascade(label='File', 
+                                 menu=self.file_menu, underline=0)
         
-        menubar.help_menu = tk.Menu(menubar, tearoff=False)
-        menubar.help_menu.add_command(label='Welcome')
-        menubar.help_menu.add_command(label='About', underline=0, 
+        help_menu = tk.Menu(self.menubar, tearoff=False)
+        help_menu.add_command(label='Welcome')
+        help_menu.add_command(label='About', underline=0, 
                                       command=self.show_info_about)
-        menubar.add_cascade(label='Help', menu=menubar.help_menu, underline=0)
+        self.menubar.add_cascade(label='Help', menu=help_menu, underline=0)
         
-        self.parent.config(menu=menubar)
+        self.parent.config(menu=self.menubar)
     
     def _init_imageframe(self):
         """
@@ -162,7 +164,7 @@ class View(tk.Frame):
 
         Parameters
         ----------
-        controller : <type>
+        controller : tracer_controller.Controller
             Class onject blueprint. Reference to the app Controller, 
             which links the Viewer to the Model.
 
@@ -174,6 +176,14 @@ class View(tk.Frame):
         self.controller = controller
     
     def show_info_about(self):
+        """
+        Shows information about the application. 
+
+        Returns
+        -------
+        None.
+
+        """
         _text = self.controller.get_info_about()
         tk.messagebox.showinfo(title='About', message=_text.center(40))
     
@@ -216,8 +226,11 @@ class View(tk.Frame):
         _image_path = filedialog.askopenfilename(title='Open image', 
                                                  initialdir='./', 
                                                  filetypes=filetypes)
+        if not _image_path:
+            return
         self.controller.open_image(_image_path)
         self.draw_image()
+        self.file_menu.entryconfig(index=1, state='normal')
     
     def draw_image(self):
         """
@@ -270,8 +283,8 @@ class View(tk.Frame):
 
         Parameters
         ----------
-        event : <Enter>
-            Cursor enters image area.
+        event : tkinter.Event
+            <Enter> - Cursor enters image area.
 
         Returns
         -------
@@ -286,8 +299,8 @@ class View(tk.Frame):
 
         Parameters
         ----------
-        event : <Leave>
-            Cursor leaves image area.
+        event : tkinter.Event
+            <Leave> - Cursor leaves image area.
 
         Returns
         -------
@@ -303,8 +316,8 @@ class View(tk.Frame):
 
         Parameters
         ----------
-        event : <Motion>
-            Cursor motion over image area.
+        event : tkinter.Event
+            <Motion> - Cursor motion over image area.
 
         Returns
         -------
@@ -324,8 +337,8 @@ class View(tk.Frame):
 
         Parameters
         ----------
-        event : <Configure>
-            Canvas area resizing.
+        event : tkinter.Event
+            <Configure> - Canvas area resizing.
 
         Returns
         -------
@@ -362,8 +375,8 @@ class View(tk.Frame):
 
         Parameters
         ----------
-        event : <MouseWheel>
-            Vertical scrolling of canvas area.
+        event : tkinter.Event
+            <MouseWheel> - Vertical scrolling of canvas area.
 
         Returns
         -------
@@ -379,9 +392,9 @@ class View(tk.Frame):
 
         Parameters
         ----------
-        event : <Shift-MouseWheel>
-            Horizontal scrolling of canvas area by key + mouse wheel 
-            combination.
+        event : tkinter.Event
+            <Shift-MouseWheel> - Horizontal scrolling of canvas area by 
+            key + mouse wheel combination.
 
         Returns
         -------
@@ -396,8 +409,8 @@ class View(tk.Frame):
 
         Parameters
         ----------
-        event : <KeyPress>
-            Any key pressed by the user.
+        event : tkinter.Event
+            <KeyPress> - Any key pressed by the user.
 
         Returns
         -------
@@ -413,8 +426,8 @@ class View(tk.Frame):
 
         Parameters
         ----------
-        event : <KeyRelease>
-            Release of the key pressed by the user.
+        event : tkinter.Event
+            <KeyRelease> - Release of the key pressed by the user.
 
         Returns
         -------
@@ -429,15 +442,15 @@ class View(tk.Frame):
 
         Parameters
         ----------
-        event : <Button-1>
-            Activates when clicked on the image.
+        event : tkinter.Event
+            <Button-1> - Activates when clicked on the image.
 
         Returns
         -------
         None.
 
         """
-        _confirm = QuestionWindow(self, event.x, event.y)
+        QuestionWindow(self, event.x, event.y)
     
     def message_trace_finished(self):
         """
@@ -467,7 +480,7 @@ class View(tk.Frame):
 
         """
         _message = 'Are you sure?\n\nResult will be lost!!'
-        _result = tk.messagebox.askquestion(title='Warning', 
+        _result = tk.messagebox.askquestion(title='Warning', default='no', 
                                             message=_message, icon='warning')
         if _result == 'no':
             self.message_trace_finished()
@@ -513,6 +526,8 @@ class View(tk.Frame):
         self.file_info.config(text='')
         self.position_info.config(text='')
         self.size_info.config(text='')
+        
+        self.file_menu.entryconfig(index=1, state='disabled')
 
 
 
@@ -522,7 +537,7 @@ class QuestionWindow(tk.Toplevel):
     
     def __init__(self, parent, x, y):
         super().__init__()
-        
+
         self.x = x
         self.y = y
         self.contr = parent.controller
@@ -539,28 +554,28 @@ class QuestionWindow(tk.Toplevel):
         _label = tk.Label(self, text='Start trace to the...')
         _label.pack(side='top', pady=10)#fill='x', expand=True)
         
-        self.l_icon = tk.PhotoImage(file='./left.png')
+        self.l_icon = tk.PhotoImage(file='./_resources/left.png')
         _left = ttk.Button(self, text=' Left', width=8, 
                            image=self.l_icon, compound=tk.LEFT, 
-                           command=lambda: self.button_clicked('LEFT'))
+                           command=lambda: self._event_btn_clicked('LEFT'))
         _left.pack(side='left', padx=10, pady=10, fill='x')
         
-        self.r_icon = tk.PhotoImage(file='./right.png')
+        self.r_icon = tk.PhotoImage(file='./_resources/right.png')
         _right = ttk.Button(self, text='Right ', width=8, 
                             image=self.r_icon, compound=tk.RIGHT, 
-                            command=lambda: self.button_clicked('RIGHT'))
+                            command=lambda: self._event_btn_clicked('RIGHT'))
         _right.pack(side='right', padx=10, pady=10, fill='x')
         
         #_cancel = ttk.Button(self, text='Cancel', command=self.destroy)
         #_cancel.pack(side='bottom', pady=10)
         
-    def button_clicked(self, direction):
-        self.contr.start_trace(direction=direction, x=self.x, y=self.y)
+    def _event_btn_clicked(self, direction):
         self.destroy()
+        self.contr.start_trace(direction=direction, x=self.x, y=self.y)
+        
         
        
-        
-
+    
 
 class PatchedCanvas(tk.Canvas):
     """

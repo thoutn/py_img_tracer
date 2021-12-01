@@ -20,10 +20,11 @@ class Controller:
         self.view = view
         
     def open_image(self, _image_path):
-        _image_name = './' + (_image_path[::-1].split('/')[0])[::-1]
+        _image_name = '~/' + (_image_path[::-1].split('/')[0])[::-1]
+        #self.view.file_info.config(text=_image_name)
         self.view.file_info.config(text=_image_name)
         
-        self.model.image_name = _image_name
+        self.model.image_name = _image_path
         self.model.open_image()
         self.pil_image = PIL.ImageTk.PhotoImage(image=self.model.pil_image)
         
@@ -38,12 +39,12 @@ class Controller:
             raise ValueError('Something went wrong!')
         else:
             self.model.set_start_position(x, y)
-            self.model.start_trace(direction)
-            self.check_trace_end()
+            if self.model.start_trace(direction):
+                self.check_trace_end()
             
     def check_trace_end(self):
-        if self.model.check_trace_end():
-            self.view.message_trace_finished()
+        #if self.model.check_trace_end():
+        self.view.message_trace_finished()
  
     def save_result(self, _filename):
         self.model.save_contour(filename=_filename)
