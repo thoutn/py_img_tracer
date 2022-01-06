@@ -7,7 +7,7 @@ Created on Thu Nov 18 10:28:00 2021
 
 
 import tkinter as tk
-from win32api import GetMonitorInfo, MonitorFromPoint
+#from win32api import GetMonitorInfo, MonitorFromPoint
 import tracer_model as tm
 import tracer_view as tv
 import tracer_controller as tc
@@ -26,9 +26,7 @@ class MainApp(tk.Tk):
         #self.iconbitmap('./')
         
         model = tm.Model()
-        
         view = tv.View(self)
-        
         controller = tc.Controller(model, view)
         
         view.set_controller(controller)

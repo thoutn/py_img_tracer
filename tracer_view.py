@@ -6,20 +6,25 @@ Created on Thu Nov 18 10:28:00 2021
 """
 
 
-import numpy as np
-import cv2
 import PIL.Image
 import PIL.ImageTk
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
-from win32api import GetMonitorInfo, MonitorFromPoint
+#import sys
+import platform
+
+#if sys.platform == 'win32':
+if platform.system() == 'Windows':
+    from win32api import GetMonitorInfo, MonitorFromPoint
+
+import tkextend as tke_
+import tracer_view_edit as tv_e
 
 
 
 
-
-class View(tk.Frame):
+class View(tke_.PopUpsMixin, tk.Frame):
     
     def __init__(self, parent):
         super().__init__()
@@ -27,7 +32,7 @@ class View(tk.Frame):
         self.parent = parent
         #self.parent.lift()
         #self.parent.attributes('-topmost', True)
-        
+
         self._init_main_geometry()
         self._init_menubar()
         self._init_imageframe()
@@ -49,16 +54,20 @@ class View(tk.Frame):
         None.
 
         """
-        monitor_info = GetMonitorInfo(MonitorFromPoint((0,0)))
-        work_area = monitor_info.get('Work')
-        self._screenx = work_area[2]
-        self._screeny = work_area[3]
-        
+        if platform.system() == 'Windows':
+            monitor_info = GetMonitorInfo(MonitorFromPoint((0,0)))
+            work_area = monitor_info.get('Work')
+            self._screenx = work_area[2]
+            self._screeny = work_area[3]
+        elif platform.system() == 'Linux':
+            self._screenx = self.parent.winfo_screenwidth()
+            self._screeny = self.parent.winfo_screenheight()
+
         self._sizex = 500
         self._sizey = 500
         self._posx = self._screenx // 2 - self._sizex // 2
         self._posy = self._screeny // 2 - self._sizey // 2 - 25
-        
+
         self.parent.geometry(f'{self._sizex}x{self._sizey}')
         self.parent.geometry(f'+{self._posx}+{self._posy}')
         self.parent.minsize(500, 500)
@@ -87,21 +96,31 @@ class View(tk.Frame):
         # To remove the dashed line, the ['tearoff'] property of the menu is 
         # set to False. 
         self.file_menu = tk.Menu(self.menubar, tearoff=False)
+        self.icon_open = tk.PhotoImage(file='./_resources/01_open-icon.png')
         self.file_menu.add_command(label='Open...', underline=0, 
+                                   image=self.icon_open, compound=tk.LEFT, 
                                    command=self.open_image)
-        self.file_menu.add_command(label='Close', underline=0, 
+        self.icon_close = tk.PhotoImage(file='./_resources/01_close-icon.png')
+        self.file_menu.add_command(label='Close', underline=0,
+                                   image=self.icon_close, compound=tk.LEFT, 
                                    command=self.close_image)
         self.file_menu.entryconfig(index=1, state='disabled')
         self.file_menu.add_separator()
+        self.icon_exit = tk.PhotoImage(file='./_resources/01_power-icon.png')
         self.file_menu.add_command(label='Exit', underline=1, 
+                                   image=self.icon_exit, compound=tk.LEFT, 
                                    command=self.close_main)
         self.menubar.add_cascade(label='File', 
                                  menu=self.file_menu, underline=0)
         
         help_menu = tk.Menu(self.menubar, tearoff=False)
-        help_menu.add_command(label='Welcome')
+        self.icon_tutorial = tk.PhotoImage(file='./_resources/tutorial-icon.png')
+        help_menu.add_command(label='Tutorial', underline=0, 
+                              image=self.icon_tutorial, compound=tk.LEFT)
+        self.icon_about = tk.PhotoImage(file='./_resources/about-icon.png')
         help_menu.add_command(label='About', underline=0, 
-                                      command=self.show_info_about)
+                              image=self.icon_about, compound=tk.LEFT, 
+                              command=self.show_info_about)
         self.menubar.add_cascade(label='Help', menu=help_menu, underline=0)
         
         self.parent.config(menu=self.menubar)
@@ -116,7 +135,7 @@ class View(tk.Frame):
 
         """
         self.frame_w_bar = tk.Frame(self)
-        self.canvas = PatchedCanvas(self.frame_w_bar)
+        self.canvas = tke_.PatchedCanvas(self.frame_w_bar)
         #self.canvas = tk.Canvas(self.frame_w_bar, 
         #                            scrollregion=(0, 0, 1000, 800), bg='grey')
         self.canvas.config(scrollregion=(0, 0, 1000, 800), bg='grey')
@@ -254,7 +273,7 @@ class View(tk.Frame):
         self.canvas.tag_bind(self.tag_cursor, '<Enter>', self._event_enter)
         self.canvas.tag_bind(self.tag_cursor, '<Leave>', self._event_leave)
         self.canvas.tag_bind(self.tag_cursor, '<Motion>', self._event_motion)
-        self.canvas.tag_bind(self.tag_cursor, '<Button-1>', self._event_click)
+        self.canvas.tag_bind(self.tag_cursor, '<Button-1>', self._event_click_on_img)
         self.canvas.bind('<Configure>', self._event_resize_canvas)
         
         posx = self._image.width() // 2
@@ -384,7 +403,7 @@ class View(tk.Frame):
 
         """
         if not self.key_is_pressed:
-            self.canvas.yview_scroll(int(-1*(event.delta/120)), 'units')
+            self.canvas.yview_scroll(-event.delta//120, 'units')
     
     def _event_hor_scroll(self, event):
         """
@@ -401,7 +420,7 @@ class View(tk.Frame):
         None.
 
         """
-        self.canvas.xview_scroll(int(-1*event.delta/120), 'units')
+        self.canvas.xview_scroll(-event.delta//120, 'units')
         
     def _event_key_down(self, event):
         """
@@ -436,7 +455,7 @@ class View(tk.Frame):
         """
         self.key_is_pressed = False
     
-    def _event_click(self, event):
+    def _event_click_on_img(self, event):
         """
         Invites the user to start the task (trace of image feature). 
 
@@ -462,46 +481,14 @@ class View(tk.Frame):
         None.
 
         """
-        _message = 'Trace finished.\n\nSave traced contour to file?'
+        _message = 'Trace finished.\n\nEdit traced contour?'
         _result = tk.messagebox.askquestion(title='Confirmation', 
                                             message=_message)
         if _result == 'yes':
-            self.save_result()
+            self.parent.withdraw()
+            tv_e.AdjustContourWindow(self)
         else: 
-            self.message_confirm_delete()
-    
-    def message_confirm_delete(self):
-        """
-        Invites the user to confirm the possible loss of the result. 
-
-        Returns
-        -------
-        None.
-
-        """
-        _message = 'Are you sure?\n\nResult will be lost!!'
-        _result = tk.messagebox.askquestion(title='Warning', default='no', 
-                                            message=_message, icon='warning')
-        if _result == 'no':
-            self.message_trace_finished()
-        else:
-            pass
-        
-    def save_result(self):
-        """
-        Saves the result into an external file. 
-
-        Returns
-        -------
-        None.
-
-        """
-        _filename = filedialog.asksaveasfilename(confirmoverwrite=False, 
-                                                 defaultextension='.txt')
-        if _filename:
-            self.controller.save_result(_filename)
-        else:
-            self.message_confirm_delete()
+            self.message_confirm_save()
     
     def close_image(self):
         """
@@ -548,14 +535,15 @@ class QuestionWindow(tk.Toplevel):
                       + f'+{parent.winfo_rooty() - 65 + y}')
         #self.overrideredirect(True)
         #self.transient(True)
-        self.attributes('-toolwindow', True)
+        if platform.system() == 'Windows':
+            self.attributes('-toolwindow', True)
         self.focus_set()
         
         _label = tk.Label(self, text='Start trace to the...')
         _label.pack(side='top', pady=10)#fill='x', expand=True)
         
         self.l_icon = tk.PhotoImage(file='./_resources/left.png')
-        _left = ttk.Button(self, text=' Left', width=8, 
+        _left = ttk.Button(self, text=' Left', width=8,
                            image=self.l_icon, compound=tk.LEFT, 
                            command=lambda: self._event_btn_clicked('LEFT'))
         _left.pack(side='left', padx=10, pady=10, fill='x')
@@ -565,42 +553,30 @@ class QuestionWindow(tk.Toplevel):
                             image=self.r_icon, compound=tk.RIGHT, 
                             command=lambda: self._event_btn_clicked('RIGHT'))
         _right.pack(side='right', padx=10, pady=10, fill='x')
-        
+
+        self.wait_visibility()
+        self.grab_set()
         #_cancel = ttk.Button(self, text='Cancel', command=self.destroy)
         #_cancel.pack(side='bottom', pady=10)
         
-    def _event_btn_clicked(self, direction):
+    def _event_btn_clicked(self, direction: str):
+        """
+        Starts the trace. 
+
+        Parameters
+        ----------
+        direction : str
+            Direction in which the trace should be initiated.
+
+        Returns
+        -------
+        None.
+
+        """
         self.destroy()
         self.contr.start_trace(direction=direction, x=self.x, y=self.y)
         
-        
-       
-    
 
-class PatchedCanvas(tk.Canvas):
-    """
-    A fix for the tk.Canvas class, specifically of the 'unbind' method. 
-    """
-    
-    def __init__(self, parent):
-        super().__init__(parent)
-        
-    def unbind(self, sequence, funcid=None):
-        """
-        See:
-            http://stackoverflow.com/questions/6433369/
-            deleting-and-changing-a-tkinter-event-binding-in-python
-        """
 
-        if not funcid:
-            self.tk.call('bind', self._w, sequence, '')
-            return
-        func_callbacks = self.tk.call(
-            'bind', self._w, sequence, None).split('\n')
-        new_callbacks = [
-            l for l in func_callbacks if l[6:6 + len(funcid)] != funcid]
-        self.tk.call('bind', self._w, sequence, '\n'.join(new_callbacks))
-        self.deletecommand(funcid)
-        
 
 
